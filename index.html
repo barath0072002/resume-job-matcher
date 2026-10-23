@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Analyze resume skills and compare them with job descriptions.">
+<title>ResumeMatch | Resume Analyzer</title>
+
+<style>
+:root {
+  --primary: #5145cd;
+  --dark: #171b35;
+  --muted: #667085;
+  --bg: #f5f6fb;
+  --border: #e3e6ef;
+  --green: #15803d;
+  --red: #b91c1c;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--dark);
+  font: 15px/1.6 Arial, sans-serif;
+}
+header {
+  background: linear-gradient(120deg,#211d62,#5145cd,#805ad5);
+  color: white;
+  padding: 32px 20px 45px;
+}
+.container { max-width: 1100px; margin: auto; padding: 20px; }
+.logo { font-size: 21px; font-weight: bold; }
+header h1 { font-size: clamp(28px,5vw,42px); margin: 20px 0 8px; }
+header p { color: #e6e7ff; margin: 0; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 5px 20px #171b3508;
+  min-width: 0;
+}
+h2 { font-size: 21px; margin: 0 0 10px; }
+h3 { font-size: 17px; margin-top: 0; }
+label { display: block; font-weight: bold; margin: 13px 0 7px; }
+textarea, input[type=file] {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd0df;
+  border-radius: 9px;
+  font: inherit;
+  background: #fff;
+}
+textarea { min-height: 210px; resize: vertical; }
+button {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 17px;
+  background: var(--primary);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 6px 4px 0 0;
+}
+button:hover { opacity: .87; }
+.secondary { background: #e8e7ff; color: #3730a3; }
+.neutral { background: #e5e7eb; color: #222; }
+.small { color: var(--muted); font-size: 13px; }
+.notice {
+  padding: 14px;
+  background: #fff7e8;
+  border: 1px solid #f5d9a7;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  color: #854d0e;
+}
+#results { display: none; }
+.metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 15px; }
+.metric {
+  background: white;
+  padding: 19px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+}
+.number { font-size: 32px; color: var(--primary); font-weight: bold; }
+.results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 17px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { background: #eeecff; color: #3730a3; border-radius: 20px; padding: 5px 10px; font-size: 13px; }
+.good { background: #dcfce7; color: #166534; }
+.missing { background: #fee2e2; color: #991b1b; }
+.bar { height: 12px; background: #e5e7eb; border-radius: 20px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--primary); width: 0; transition: width .3s; }
+li { margin-bottom: 8px; }
+footer { text-align: center; padding: 25px; color: var(--muted); font-size: 13px; }
+@media(max-width:720px) {
+  .grid, .results-grid, .metrics { grid-template-columns: 1fr; }
+  .container { padding: 13px; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">✦ ResumeMatch</div>
+    <h1>AI-Powered Resume Analyzer</h1>
+    <p>Discover your skills, compare job requirements, and improve your resume.</p>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="notice">
+    <strong>Privacy:</strong> Your resume text is processed locally in your browser.
+    PDF text extraction uses the PDF.js library from a CDN. Scanned PDFs may require OCR.
+    This application does not upload your resume to a backend.
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>1. Upload Resume</h2>
+      <p class="small">Upload a PDF or paste resume text.</p>
+
+      <label for="resumeFile">Choose PDF resume</label>
+      <input type="file" id="resumeFile" accept=".pdf,application/pdf">
+      <p class="small" id="fileStatus">No PDF selected.</p>
+
+      <label for="resumeText">Resume text</label>
+      <textarea id="resumeText" placeholder="Paste your resume here..."></textarea>
+    </section>
+
+    <section class="card">
+      <h2>2. Job Description</h2>
+      <p class="small">Paste the complete job description.</p>
+
+      <label for="jobText">Job requirements</label>
+      <textarea id="jobText" placeholder="Example: We need a Data Analyst with Python, SQL, Pandas, statistics and machine learning skills..."></textarea>
+
+      <button id="analyzeBtn">Analyze Resume</button>
+      <button class="secondary" id="sampleBtn">Load Sample</button>
+      <button class="neutral" id="clearBtn">Clear</button>
+      <p class="small" id="status">Ready to analyze.</p>
+    </section>
+  </div>
+
+  <section id="results">
+    <h2>3. Analysis Results</h2>
+
+    <div class="metrics">
+      <div class="metric">
+        <div>Keyword Match</div>
+        <div class="number" id="matchScore">0%</div>
+        <div class="small">Estimated text overlap</div>
+      </div>
+      <div class="metric">
+        <div>Skill Coverage</div>
+        <div class="number" id="coverageScore">0%</div>
+        <div class="small">Detected job skills found</div>
+      </div>
+      <div class="metric">
+        <div>Job Skills</div>
+        <div class="number" id="jobCount">0</div>
+        <div class="small">Skills detected in job description</div>
+      </div>
+    </div>
+
+    <div class="results-grid">
+      <section class="card">
+        <h3>Skills in Resume</h3>
+        <div id="resumeSkills" class="chips"></div>
+      </section>
+      <section class="card">
+        <h3>Skills in Job Description</h3>
+        <div id="jobSkills" class="chips"></div>
+      </section>
+      <section class="card">
+        <h3>Matched Skills</h3>
+        <div id="matchedSkills" class="chips"></div>
+      </section>
+      <section class="card">
+        <h3>Missing Skills</h3>
+        <div id="missingSkills" class="chips"></div>
+      </section>
+      <section class="card">
+        <h3>Skill Coverage</h3>
+        <div class="bar"><div id="coverageBar"></div></div>
+        <p class="small" id="coverageText"></p>
+        <h3>Keyword Similarity</h3>
+        <div class="bar"><div id="matchBar"></div></div>
+        <p class="small" id="matchText"></p>
+      </section>
+      <section class="card">
+        <h3>Recommendations</h3>
+        <ul id="recommendations"></ul>
+      </section>
+    </div>
+
+    <section class="card">
+      <h3>Download Analysis Report</h3>
+      <p class="small">Export the scores and skill-gap analysis as a text report.</p>
+      <button id="downloadBtn">Download Report</button>
+    </section>
+
+    <p class="small">
+      Scores are heuristic estimates, not hiring probabilities.
+      Keyword matching can miss synonyms and context.
+    </p>
+  </section>
+</main>
+
+<footer>ResumeMatch · Built with HTML, CSS and JavaScript</footer>
+
+<script>
+"use strict";
+
+const SKILLS = [
+  "Python", "Java", "C++", "SQL", "R", "JavaScript", "HTML", "CSS",
+  "Pandas", "NumPy", "Matplotlib", "Plotly", "Power BI", "Tableau",
+  "Excel", "Statistics", "Data Analysis", "Data Visualization",
+  "Data Cleaning", "Machine Learning", "Deep Learning",
+  "Natural Language Processing", "NLP", "Computer Vision",
+  "Scikit-learn", "TensorFlow", "PyTorch", "Keras", "OpenCV",
+  "MySQL", "PostgreSQL", "MongoDB", "Git", "GitHub", "Linux",
+  "Docker", "AWS", "Azure", "Flask", "FastAPI", "Streamlit",
+  "Django", "REST API", "ETL", "Big Data", "Spark", "Hadoop",
+  "Reinforcement Learning", "Time Series", "Feature Engineering",
+  "Model Evaluation", "Data Structures", "Algorithms", "Communication",
+  "Teamwork", "Problem Solving", "Project Management", "Data Science",
+  "Data Engineering", "MLOps", "Agile", "Leadership"
+];
+
+const $ = id => document.getElementById(id);
+let latestReport = "";
+
+function normalize(text) {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractSkills(text) {
+  const normalized = normalize(text);
+
+  return SKILLS.filter(skill => {
+    const pattern = new RegExp(
+      "(^|[^a-z0-9+#])" +
+      escapeRegExp(skill.toLowerCase()) +
+      "(?=$|[^a-z0-9+#])",
+      "i"
+    );
+    return pattern.test(normalized);
+  }).sort((a, b) => a.localeCompare(b));
+}
+
+const STOPWORDS = new Set((
+  "a an the and or but if then than with from into for to of in on at " +
+  "by as is are was were be been this that these those it we you your " +
+  "our they will can should must have has had do does did not about role " +
+  "work looking seeking required preferred ability strong good excellent " +
+  "including responsibilities experience years"
+).split(/\s+/));
+
+function keywordSimilarity(resume, job) {
+  function tokenize(text) {
+    return normalize(text)
+      .replace(/[^a-z0-9+#.\s-]/g, " ")
+      .split(/[\s.-]+/)
+      .filter(word => word.length > 2 && !STOPWORDS.has(word));
+  }
+
+  const a = new Set(tokenize(resume));
+  const b = new Set(tokenize(job));
+
+  if (!a.size || !b.size) return 0;
+
+  let common = 0;
+  b.forEach(word => { if (a.has(word)) common++; });
+
+  const union = new Set([...a, ...b]).size;
+  return union ? Math.round(common / union * 100) : 0;
+}
+
+function showChips(id, items, type = "") {
+  const container = $(id);
+  container.replaceChildren();
+
+  if (!items.length) {
+    const span = document.createElement("span");
+    span.className = "small";
+    span.textContent = "No skills detected.";
+    container.appendChild(span);
+    return;
+  }
+
+  items.forEach(item => {
+    const span = document.createElement("span");
+    span.className = "chip " + type;
+    span.textContent = item;
+    container.appendChild(span);
+  });
+}
+
+function showRecommendations(items) {
+  const list = $("recommendations");
+  list.replaceChildren();
+
+  items.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.appendChild(li);
+  });
+}
+
+function analyze() {
+  const resume = $("resumeText").value.trim();
+  const job = $("jobText").value.trim();
+
+  if (resume.length < 20) {
+    $("status").textContent = "Please upload a readable PDF or paste resume text.";
+    return;
+  }
+
+  if (job.length < 30) {
+    $("status").textContent = "Please enter a fuller job description.";
+    return;
+  }
+
+  const resumeSkills = extractSkills(resume);
+  const jobSkills = extractSkills(job);
+  const resumeSet = new Set(resumeSkills.map(s => s.toLowerCase()));
+
+  const matched = jobSkills.filter(s => resumeSet.has(s.toLowerCase()));
+  const missing = jobSkills.filter(s => !resumeSet.has(s.toLowerCase()));
+
+  const coverage = jobSkills.length
+    ? Math.round(matched.length / jobSkills.length * 100)
+    : 0;
+
+  const match = keywordSimilarity(resume, job);
+
+  $("matchScore").textContent = match + "%";
+  $("coverageScore").textContent = coverage + "%";
+  $("jobCount").textContent = jobSkills.length;
+
+  showChips("resumeSkills", resumeSkills);
+  showChips("jobSkills", jobSkills);
+  showChips("matchedSkills", matched, "good");
+  showChips("missingSkills", missing, "missing");
+
+  $("coverageBar").style.width = coverage + "%";
+  $("matchBar").style.width = match + "%";
+
+  $("coverageText").textContent =
+    matched.length + " of " + jobSkills.length +
+    " detected job skills are present in your resume.";
+
+  $("matchText").textContent = "Estimated keyword overlap: " + match + "%.";
+
+  const tips = [];
+
+  if (missing.length) {
+    tips.push("Review the missing skills and learn those relevant to your career goals.");
+    tips.push("If you already know a missing skill, demonstrate it with a genuine project or achievement.");
+  }
+
+  if (match < 20) {
+    tips.push("Review whether your real projects and experience relate to the job responsibilities.");
+  }
+
+  if (!resumeSkills.length) {
+    tips.push("No catalog skills were found. Expand the SKILLS array in this HTML file.");
+  }
+
+  if (!tips.length) {
+    tips.push("Keep your resume accurate and quantify relevant achievements where possible.");
+  }
+
+  tips.push("Manually verify the results because keyword matching cannot fully understand context.");
+
+  showRecommendations(tips);
+
+  latestReport = [
+    "RESUME AND JOB MATCH REPORT",
+    "===========================",
+    "Keyword match: " + match + "%",
+    "Job skill coverage: " + coverage + "%",
+    "",
+    "Resume skills: " + (resumeSkills.join(", ") || "None detected"),
+    "Job skills: " + (jobSkills.join(", ") || "None detected"),
+    "Matched skills: " + (matched.join(", ") || "None detected"),
+    "Missing skills: " + (missing.join(", ") || "None detected"),
+    "",
+    "Scores are estimates, not hiring probabilities.",
+    "Only claim skills that reflect genuine experience."
+  ].join("\n");
+
+  $("results").style.display = "block";
+  $("status").textContent = "Analysis complete.";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+let pdfLoader;
+
+function loadPDFLibrary() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfLoader) return pdfLoader;
+
+  pdfLoader = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+
+    script.onload = () => window.pdfjsLib
+      ? resolve(window.pdfjsLib)
+      : reject(new Error("PDF reader could not initialize."));
+
+    script.onerror = () => reject(
+      new Error("Could not load PDF.js. Paste the resume text manually.")
+    );
+
+    document.head.appendChild(script);
+  });
+
+  return pdfLoader;
+}
+
+$("resumeFile").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.size > 12 * 1024 * 1024) {
+    $("fileStatus").textContent = "Choose a PDF smaller than 12 MB.";
+    event.target.value = "";
+    return;
+  }
+
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    $("fileStatus").textContent = "Please select a PDF file.";
+    return;
+  }
+
+  $("fileStatus").textContent = "Reading PDF...";
+
+  try {
+    const pdfjs = await loadPDFLibrary();
+
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    const pdf = await pdfjs.getDocument({
+      data: new Uint8Array(await file.arrayBuffer())
+    }).promise;
+
+    let text = "";
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str || "").join(" ") + "\n";
+    }
+
+    if (!text.trim()) {
+      $("fileStatus").textContent =
+        "No selectable text found. Scanned PDFs need OCR.";
+    } else {
+      $("resumeText").value = text.trim();
+      $("fileStatus").textContent =
+        "PDF extracted. Review the text before analyzing.";
+      $("status").textContent = "Resume ready.";
+    }
+  } catch (error) {
+    $("fileStatus").textContent =
+      error.message + " You can paste the resume text manually.";
+  }
+});
+
+$("analyzeBtn").addEventListener("click", analyze);
+
+$("sampleBtn").addEventListener("click", () => {
+  $("resumeText").value = `Data Science Student
+
+Skills:
+Python, SQL, Pandas, NumPy, Statistics, Data Analysis,
+Data Visualization, Scikit-learn, Machine Learning, Git, GitHub.
+
+Projects:
+Built a Python data analysis project using Pandas and Matplotlib.
+Cleaned datasets, explored patterns and presented findings.
+
+Education:
+M.Tech Data Science`;
+
+  $("jobText").value = `Data Analyst Intern
+
+Required skills include Python, SQL, Pandas, NumPy, statistics,
+data cleaning, data analysis, data visualization, Excel, Power BI,
+machine learning, problem solving, communication and Git.
+
+Responsibilities include preparing datasets, exploratory analysis,
+creating reports and dashboards, and communicating insights.
+Scikit-learn and Tableau are desirable.`;
+
+  $("fileStatus").textContent = "Sample resume loaded.";
+  $("status").textContent = "Click Analyze Resume to view the sample results.";
+});
+
+$("clearBtn").addEventListener("click", () => {
+  $("resumeFile").value = "";
+  $("resumeText").value = "";
+  $("jobText").value = "";
+  $("fileStatus").textContent = "No PDF selected.";
+  $("status").textContent = "Ready to analyze.";
+  $("results").style.display = "none";
+  latestReport = "";
+});
+
+$("downloadBtn").addEventListener("click", () => {
+  if (!latestReport) return;
+
+  const blob = new Blob([latestReport], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "resume-job-match-report.txt";
+  link.click();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+</script>
+
+</body>
+</html>
